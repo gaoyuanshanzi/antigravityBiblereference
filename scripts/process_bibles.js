@@ -37,8 +37,17 @@ async function fetchBollsChapter(translation, bookId, chapterId) {
   if (bollsCache[cacheKey]) return bollsCache[cacheKey];
   
   const url = `https://bolls.life/get-chapter/${translation}/${bookId}/${chapterId}/`;
-  const data = await fetchJson(url);
   
+  let data = [];
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    data = await fetchJson(url);
+    if (Array.isArray(data) && data.length > 0) {
+      break;
+    }
+    console.log(`\nRetry ${attempt} for ${translation} ${bookId}:${chapterId}`);
+    await delay(500 * attempt);
+  }
+
   const chapterMap = {};
   if (Array.isArray(data)) {
     data.forEach(item => {
@@ -74,17 +83,22 @@ async function processBibles() {
 
       process.stdout.write(`Processing Book ${bookNum}/${kjvData.length} (${bookName})...\r`);
 
-      const chapterPromises = [];
-      for (let c = 0; c < bookKjv.chapters.length; c++) {
-        const chapterNum = c + 1;
-        if (isOT) {
-          chapterPromises.push(fetchBollsChapter('WLC', bookNum, chapterNum));
-        } else {
-          chapterPromises.push(Promise.resolve({}));
+      const wlcChapters = [];
+      const batchSize = 10;
+      for (let i = 0; i < bookKjv.chapters.length; i += batchSize) {
+        const batch = [];
+        for (let j = 0; j < batchSize && (i + j) < bookKjv.chapters.length; j++) {
+          const chapterNum = i + j + 1;
+          if (isOT) {
+            batch.push(fetchBollsChapter('WLC', bookNum, chapterNum));
+          } else {
+            batch.push(Promise.resolve({}));
+          }
         }
+        const results = await Promise.all(batch);
+        wlcChapters.push(...results);
+        if (isOT) await delay(100); 
       }
-
-      const wlcChapters = await Promise.all(chapterPromises);
 
       for (let c = 0; c < bookKjv.chapters.length; c++) {
         const chapterKjv = bookKjv.chapters[c];
