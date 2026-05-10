@@ -59,25 +59,33 @@ export default function BibleViewer({ data, onDataFiltered }) {
 
     // 1. Reference Search
     if (refSearch.trim() !== '') {
-      const q = refSearch.toLowerCase().trim();
+      // Split by comma, trim whitespace, and limit to 10 references
+      const queries = refSearch.split(',')
+                               .map(q => q.toLowerCase().trim())
+                               .filter(q => q)
+                               .slice(0, 10);
       
-      const rangeMatch = q.match(/(.+?)\s*:\s*(\d+)\s*-\s*(\d+)/);
-      if (rangeMatch) {
-        const baseRef = rangeMatch[1]; 
-        const startVerse = parseInt(rangeMatch[2], 10);
-        const endVerse = parseInt(rangeMatch[3], 10);
+      result = result.filter(item => {
+        const itemIndexLower = item.index.toLowerCase();
         
-        result = result.filter(item => {
-          const itemIndexLower = item.index.toLowerCase();
-          if (!itemIndexLower.startsWith(baseRef + ':')) return false;
-          
-          const itemVerseStr = itemIndexLower.split(':')[1];
-          const itemVerse = parseInt(itemVerseStr, 10);
-          return itemVerse >= startVerse && itemVerse <= endVerse;
+        // Match against ANY of the comma-separated queries (OR logic within reference search)
+        return queries.some(q => {
+          const rangeMatch = q.match(/(.+?)\s*:\s*(\d+)\s*-\s*(\d+)/);
+          if (rangeMatch) {
+            const baseRef = rangeMatch[1]; 
+            const startVerse = parseInt(rangeMatch[2], 10);
+            const endVerse = parseInt(rangeMatch[3], 10);
+            
+            if (!itemIndexLower.startsWith(baseRef + ':')) return false;
+            
+            const itemVerseStr = itemIndexLower.split(':')[1];
+            const itemVerse = parseInt(itemVerseStr, 10);
+            return itemVerse >= startVerse && itemVerse <= endVerse;
+          } else {
+            return itemIndexLower.includes(q);
+          }
         });
-      } else {
-        result = result.filter(item => item.index.toLowerCase().includes(q));
-      }
+      });
     }
 
     // 2. Column AND Search
