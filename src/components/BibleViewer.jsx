@@ -81,9 +81,35 @@ export default function BibleViewer({ data, onDataFiltered }) {
             const itemVerseStr = itemIndexLower.split(':')[1];
             const itemVerse = parseInt(itemVerseStr, 10);
             return itemVerse >= startVerse && itemVerse <= endVerse;
-          } else {
-            return itemIndexLower.includes(q);
           }
+          
+          if (q.includes(':')) {
+            // Exact verse match (e.g., "genesis 1:1" avoids matching "1:10")
+            if (itemIndexLower === q) return true;
+            
+            // Allow partial book name (e.g., "gen 1:1" matching "genesis 1:1")
+            const [qBookChap, qVerse] = q.split(':');
+            const [iBookChap, iVerse] = itemIndexLower.split(':');
+            return iBookChap.startsWith(qBookChap) && iVerse === qVerse;
+          }
+          
+          if (/\s\d+$/.test(q)) {
+            // Exact chapter match (e.g., "genesis 1" matching "genesis 1:*")
+            // Allow partial book like "gen 1" -> iBookChap ("genesis 1")
+            const qMatch = q.match(/(.+?)\s+(\d+)$/);
+            if (qMatch) {
+              const qBook = qMatch[1];
+              const qChap = qMatch[2];
+              const iMatch = itemIndexLower.match(/(.+?)\s+(\d+):/);
+              if (iMatch) {
+                return iMatch[1].startsWith(qBook) && iMatch[2] === qChap;
+              }
+            }
+            return itemIndexLower.startsWith(q + ':');
+          }
+
+          // Exact book match or partial book (e.g., "genesis" matching "genesis *")
+          return itemIndexLower.startsWith(q + ' ') || itemIndexLower.startsWith(q + ':') || itemIndexLower.includes(q);
         });
       });
     }
@@ -108,6 +134,14 @@ export default function BibleViewer({ data, onDataFiltered }) {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Results Count Box */}
+      <div className="bg-indigo-50/60 p-2 border-b border-indigo-100 flex items-center justify-center text-indigo-900 font-semibold text-sm shadow-inner">
+        <span className="bg-white px-4 py-1.5 rounded-full shadow-sm border border-indigo-200 flex items-center gap-2">
+          <BookOpen size={16} className="text-indigo-500" />
+          <span>검색된 성경 구절: <span className="text-indigo-600 text-base">{filteredData.length.toLocaleString()}</span> 개</span>
+        </span>
+      </div>
+
       <div className="p-4 bg-slate-50 border-b border-slate-200">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
