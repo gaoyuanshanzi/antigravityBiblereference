@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
-import { Search, X } from 'lucide-react';
+import { Search, X, BookOpen } from 'lucide-react';
 
 const ColumnHeader = ({ title, searchTerm, onSearchChange, isActive, onClear }) => (
   <div className="flex flex-col gap-2 p-3 bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
@@ -15,9 +15,8 @@ const ColumnHeader = ({ title, searchTerm, onSearchChange, isActive, onClear }) 
         type="text"
         value={searchTerm}
         onChange={(e) => onSearchChange(e.target.value)}
-        disabled={!isActive && isActive !== null}
         placeholder="Search..."
-        className="block w-full pl-8 pr-8 py-1.5 border border-slate-300 rounded-md text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
+        className="block w-full pl-8 pr-8 py-1.5 border border-slate-300 rounded-md text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
       />
       {searchTerm && (
         <button 
@@ -39,9 +38,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
     lxx: ''
   });
 
-  const activeSearchCol = useMemo(() => {
-    return Object.keys(searches).find(k => searches[k].trim() !== '') || null;
-  }, [searches]);
+  const [refSearch, setRefSearch] = useState('');
 
   const handleSearchChange = (col, value) => {
     setSearches(prev => ({
@@ -58,15 +55,44 @@ export default function BibleViewer({ data, onDataFiltered }) {
   };
 
   const filteredData = useMemo(() => {
-    if (!activeSearchCol) {
-      return data;
+    let result = data;
+
+    // 1. Reference Search
+    if (refSearch.trim() !== '') {
+      const q = refSearch.toLowerCase().trim();
+      
+      const rangeMatch = q.match(/(.+?)\s*:\s*(\d+)\s*-\s*(\d+)/);
+      if (rangeMatch) {
+        const baseRef = rangeMatch[1]; 
+        const startVerse = parseInt(rangeMatch[2], 10);
+        const endVerse = parseInt(rangeMatch[3], 10);
+        
+        result = result.filter(item => {
+          const itemIndexLower = item.index.toLowerCase();
+          if (!itemIndexLower.startsWith(baseRef + ':')) return false;
+          
+          const itemVerseStr = itemIndexLower.split(':')[1];
+          const itemVerse = parseInt(itemVerseStr, 10);
+          return itemVerse >= startVerse && itemVerse <= endVerse;
+        });
+      } else {
+        result = result.filter(item => item.index.toLowerCase().includes(q));
+      }
     }
-    const term = searches[activeSearchCol].toLowerCase();
-    return data.filter(row => {
-      const cellValue = row[activeSearchCol] || '';
-      return cellValue.toLowerCase().includes(term);
-    });
-  }, [data, searches, activeSearchCol]);
+
+    // 2. Column AND Search
+    const activeTerms = Object.entries(searches).filter(([_, val]) => val.trim() !== '');
+    if (activeTerms.length > 0) {
+      result = result.filter(row => {
+        return activeTerms.every(([col, term]) => {
+          const cellValue = row[col] || '';
+          return cellValue.toLowerCase().includes(term.toLowerCase());
+        });
+      });
+    }
+
+    return result;
+  }, [data, searches, refSearch]);
 
   useEffect(() => {
     onDataFiltered(filteredData);
@@ -74,6 +100,29 @@ export default function BibleViewer({ data, onDataFiltered }) {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-4 bg-slate-50 border-b border-slate-200">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <BookOpen size={18} className="text-slate-400" />
+          </div>
+          <input
+            type="text"
+            value={refSearch}
+            onChange={(e) => setRefSearch(e.target.value)}
+            placeholder="Search Reference (e.g., Genesis, John 1, or John 1:1-15)"
+            className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          />
+          {refSearch && (
+            <button 
+              onClick={() => setRefSearch('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex border-b border-slate-200 shadow-sm z-10">
         <div className="w-[15%] flex-shrink-0 bg-slate-100 border-r border-slate-200">
           <div className="p-3 font-semibold text-slate-800 h-full flex items-center justify-center">
@@ -85,7 +134,6 @@ export default function BibleViewer({ data, onDataFiltered }) {
             title="KJV (English)" 
             searchTerm={searches.kjv} 
             onSearchChange={(v) => handleSearchChange('kjv', v)}
-            isActive={activeSearchCol === null ? null : activeSearchCol === 'kjv'}
             onClear={() => clearSearch('kjv')}
           />
         </div>
@@ -94,25 +142,22 @@ export default function BibleViewer({ data, onDataFiltered }) {
             title="KRV (Korean)" 
             searchTerm={searches.krv} 
             onSearchChange={(v) => handleSearchChange('krv', v)}
-            isActive={activeSearchCol === null ? null : activeSearchCol === 'krv'}
             onClear={() => clearSearch('krv')}
           />
         </div>
         <div className="w-[21.25%] border-r border-slate-200">
           <ColumnHeader 
-            title="WLC (Hebrew)" 
+            title="WLC/HNT (Hebrew)" 
             searchTerm={searches.wlc} 
             onSearchChange={(v) => handleSearchChange('wlc', v)}
-            isActive={activeSearchCol === null ? null : activeSearchCol === 'wlc'}
             onClear={() => clearSearch('wlc')}
           />
         </div>
         <div className="w-[21.25%]">
           <ColumnHeader 
-            title="LXX (Greek)" 
+            title="LXX/SBLGNT (Greek)" 
             searchTerm={searches.lxx} 
             onSearchChange={(v) => handleSearchChange('lxx', v)}
-            isActive={activeSearchCol === null ? null : activeSearchCol === 'lxx'}
             onClear={() => clearSearch('lxx')}
           />
         </div>
