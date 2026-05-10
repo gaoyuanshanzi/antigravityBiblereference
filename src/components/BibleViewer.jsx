@@ -88,9 +88,24 @@ export default function BibleViewer({ data, onDataFiltered }) {
             if (itemIndexLower === q) return true;
             
             // Allow partial book name (e.g., "gen 1:1" matching "genesis 1:1")
+            // Prevent "genesis 1:1" from matching "genesis 10:1" by strictly matching chapter numbers
             const [qBookChap, qVerse] = q.split(':');
             const [iBookChap, iVerse] = itemIndexLower.split(':');
-            return iBookChap.startsWith(qBookChap) && iVerse === qVerse;
+            
+            if (iVerse.trim() !== qVerse.trim()) return false;
+            
+            const qMatch = qBookChap.match(/(.+?)\s+(\d+)$/);
+            const iMatch = iBookChap.match(/(.+?)\s+(\d+)$/);
+            
+            if (qMatch && iMatch) {
+              const qBook = qMatch[1].trim();
+              const qChap = qMatch[2];
+              const iBook = iMatch[1].trim();
+              const iChap = iMatch[2];
+              
+              return iBook.startsWith(qBook) && iChap === qChap;
+            }
+            return false;
           }
           
           if (/\s\d+$/.test(q)) {
