@@ -4,26 +4,26 @@ import { Search, X, BookOpen } from 'lucide-react';
 
 const ColumnHeader = ({ title, searchTerm, onSearchChange, isActive, onClear }) => (
   <div className="flex flex-col gap-2 p-3 bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
-    <div className="font-semibold text-slate-800 flex justify-between items-center">
+    <div className="font-semibold text-slate-800 flex justify-between items-center text-xs lg:text-sm">
       <span>{title}</span>
     </div>
     <div className="relative">
       <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-        <Search size={14} className="text-slate-400" />
+        <Search size={12} className="text-slate-400" />
       </div>
       <input
         type="text"
         value={searchTerm}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Search..."
-        className="block w-full pl-8 pr-8 py-1.5 border border-slate-300 rounded-md text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+        className="block w-full pl-7 pr-7 py-1.5 border border-slate-300 rounded-md text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
       />
       {searchTerm && (
         <button 
           onClick={onClear}
           className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600"
         >
-          <X size={14} />
+          <X size={12} />
         </button>
       )}
     </div>
@@ -36,6 +36,8 @@ export default function BibleViewer({ data, onDataFiltered }) {
     web: '',
     kjv: '',
     krv: '',
+    cuv: '',
+    kougo: '',
     wlc: '',
     lxx: ''
   });
@@ -61,7 +63,6 @@ export default function BibleViewer({ data, onDataFiltered }) {
 
     // 1. Reference Search
     if (refSearch.trim() !== '') {
-      // Split by comma, trim whitespace, and limit to 10 references
       const queries = refSearch.split(',')
                                .map(q => q.toLowerCase().trim())
                                .filter(q => q)
@@ -70,7 +71,6 @@ export default function BibleViewer({ data, onDataFiltered }) {
       result = result.filter(item => {
         const itemIndexLower = item.index.toLowerCase();
         
-        // Match against ANY of the comma-separated queries (OR logic within reference search)
         return queries.some(q => {
           const rangeMatch = q.match(/(.+?)\s*:\s*(\d+)\s*-\s*(\d+)/);
           if (rangeMatch) {
@@ -86,11 +86,8 @@ export default function BibleViewer({ data, onDataFiltered }) {
           }
           
           if (q.includes(':')) {
-            // Exact verse match (e.g., "genesis 1:1" avoids matching "1:10")
             if (itemIndexLower === q) return true;
             
-            // Allow partial book name (e.g., "gen 1:1" matching "genesis 1:1")
-            // Prevent "genesis 1:1" from matching "genesis 10:1" by strictly matching chapter numbers
             const [qBookChap, qVerse] = q.split(':');
             const [iBookChap, iVerse] = itemIndexLower.split(':');
             
@@ -111,8 +108,6 @@ export default function BibleViewer({ data, onDataFiltered }) {
           }
           
           if (/\s\d+$/.test(q)) {
-            // Exact chapter match (e.g., "genesis 1" matching "genesis 1:*")
-            // Allow partial book like "gen 1" -> iBookChap ("genesis 1")
             const qMatch = q.match(/(.+?)\s+(\d+)$/);
             if (qMatch) {
               const qBook = qMatch[1];
@@ -125,7 +120,6 @@ export default function BibleViewer({ data, onDataFiltered }) {
             return itemIndexLower.startsWith(q + ':');
           }
 
-          // Exact book match or partial book (e.g., "genesis" matching "genesis *")
           return itemIndexLower.startsWith(q + ' ') || itemIndexLower.startsWith(q + ':') || itemIndexLower.includes(q);
         });
       });
@@ -183,12 +177,12 @@ export default function BibleViewer({ data, onDataFiltered }) {
       </div>
 
       <div className="flex border-b border-slate-200 shadow-sm z-10 min-w-max md:min-w-0">
-        <div className="w-[10%] flex-shrink-0 bg-slate-100 border-r border-slate-200">
-          <div className="p-3 font-semibold text-slate-800 h-full flex items-center justify-center">
+        <div className="w-[12%] flex-shrink-0 bg-slate-100 border-r border-slate-200">
+          <div className="p-3 font-semibold text-slate-800 h-full flex items-center justify-center text-xs lg:text-sm">
             Reference
           </div>
         </div>
-        <div className="w-[15%] flex-shrink-0 border-r border-slate-200">
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
           <ColumnHeader 
             title="NET (English)" 
             searchTerm={searches.net} 
@@ -196,7 +190,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
             onClear={() => clearSearch('net')}
           />
         </div>
-        <div className="w-[15%] flex-shrink-0 border-r border-slate-200">
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
           <ColumnHeader 
             title="WEB (English)" 
             searchTerm={searches.web} 
@@ -204,7 +198,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
             onClear={() => clearSearch('web')}
           />
         </div>
-        <div className="w-[15%] flex-shrink-0 border-r border-slate-200">
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
           <ColumnHeader 
             title="KJV (English)" 
             searchTerm={searches.kjv} 
@@ -212,7 +206,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
             onClear={() => clearSearch('kjv')}
           />
         </div>
-        <div className="w-[15%] flex-shrink-0 border-r border-slate-200">
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
           <ColumnHeader 
             title="KRV (Korean)" 
             searchTerm={searches.krv} 
@@ -220,7 +214,23 @@ export default function BibleViewer({ data, onDataFiltered }) {
             onClear={() => clearSearch('krv')}
           />
         </div>
-        <div className="w-[15%] flex-shrink-0 border-r border-slate-200">
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
+          <ColumnHeader 
+            title="CUV (Chinese)" 
+            searchTerm={searches.cuv} 
+            onSearchChange={(v) => handleSearchChange('cuv', v)}
+            onClear={() => clearSearch('cuv')}
+          />
+        </div>
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
+          <ColumnHeader 
+            title="口語訳 (Japanese)" 
+            searchTerm={searches.kougo} 
+            onSearchChange={(v) => handleSearchChange('kougo', v)}
+            onClear={() => clearSearch('kougo')}
+          />
+        </div>
+        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
           <ColumnHeader 
             title="WLC/HNT (Hebrew)" 
             searchTerm={searches.wlc} 
@@ -228,7 +238,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
             onClear={() => clearSearch('wlc')}
           />
         </div>
-        <div className="w-[15%] flex-shrink-0">
+        <div className="w-[11%] flex-shrink-0">
           <ColumnHeader 
             title="LXX/SBLGNT (Greek)" 
             searchTerm={searches.lxx} 
@@ -252,25 +262,31 @@ export default function BibleViewer({ data, onDataFiltered }) {
                 const item = filteredData[index];
                 return (
                   <div className="flex border-b border-slate-100 hover:bg-indigo-50/50 transition-colors duration-150 py-2">
-                    <div className="w-[10%] p-3 text-sm font-medium text-slate-500 flex-shrink-0 flex items-start border-r border-slate-100">
+                    <div className="w-[12%] p-2 text-xs lg:text-sm font-medium text-slate-500 flex-shrink-0 flex items-start border-r border-slate-100">
                       {item.index}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
                       {item.net}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
                       {item.web}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
                       {item.kjv}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
                       {item.krv}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words" dir="rtl">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                      {item.cuv}
+                    </div>
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
+                      {item.kougo}
+                    </div>
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words" dir="rtl">
                       {item.wlc}
                     </div>
-                    <div className="w-[15%] p-3 text-sm text-slate-800 flex-shrink-0 break-words">
+                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 break-words">
                       {item.lxx}
                     </div>
                   </div>

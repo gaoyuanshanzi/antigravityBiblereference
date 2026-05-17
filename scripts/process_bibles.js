@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 const KJV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json';
 const KRV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/ko_ko.json';
 const GREEK_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/el_greek.json';
+const CUV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/zh_cuv.json';
+const KOUGO_URL = 'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/sources/ja/JapKougo/JapKougo.json';
 
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
@@ -52,7 +54,6 @@ async function fetchBollsChapter(translation, bookId, chapterId) {
   if (Array.isArray(data)) {
     data.forEach(item => {
       let text = item.text || '';
-      // Remove html tags, commonly used in NET for footnotes/formatting
       text = text.replace(/<[^>]+>/g, '').trim(); 
       chapterMap[item.verse] = text; 
     });
@@ -64,13 +65,18 @@ async function fetchBollsChapter(translation, bookId, chapterId) {
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function processBibles() {
-  console.log('Downloading Base Bible datasets (KJV, KRV, Greek)...');
+  console.log('Downloading Base Bible datasets...');
   try {
-    const [kjvData, krvData, greekData] = await Promise.all([
+    const [kjvData, krvData, greekData, cuvData, kougoDataRes] = await Promise.all([
       fetchJson(KJV_URL),
       fetchJson(KRV_URL),
-      fetchJson(GREEK_URL)
+      fetchJson(GREEK_URL),
+      fetchJson(CUV_URL),
+      fetchJson(KOUGO_URL)
     ]);
+    
+    // JapKougo is wrapped in { books: [...] }
+    const kougoData = kougoDataRes && kougoDataRes.books ? kougoDataRes.books : [];
 
     console.log('Fetching NET book list...');
     const netBooks = await fetchJson('https://bolls.life/get-books/NET/');
@@ -90,6 +96,8 @@ async function processBibles() {
       const bookKjv = kjvData[b] || { chapters: [], abbrev: bookName };
       const bookKrv = krvData[b] || { chapters: [] };
       const bookGreek = greekData[b] || { chapters: [] };
+      const bookCuv = cuvData[b] || { chapters: [] };
+      const bookKougo = kougoData[b] || { chapters: [] };
 
       process.stdout.write(`Processing Book ${bookNum}/${netBooks.length} (${bookName})...\r`);
 
@@ -133,17 +141,14 @@ async function processBibles() {
         const chapterKjv = bookKjv.chapters[c] || [];
         const chapterKrv = bookKrv.chapters[c] || [];
         const chapterGreek = bookGreek.chapters[c] || [];
+        const chapterCuv = bookCuv.chapters[c] || [];
+        const chapterKougo = bookKougo.chapters[c] || [];
 
-        // NET defines the verses
         const verses = Object.keys(netChapterMap).map(Number).sort((a,b)=>a-b);
         const maxVerse = verses.length > 0 ? Math.max(...verses) : chapterKjv.length;
         
         for (let v = 1; v <= maxVerse; v++) {
           const verseNet = netChapterMap[v] || '';
-          // If NET has no verse here, we skip it because NET is the standard.
-          // Wait, sometimes a verse is empty in some translations but exists in standard.
-          // To be safe, if verseNet is empty and it's outside the keys, we might still include it if others have it?
-          // The user said: "성경장절 기준은 NET로 해줘" (Standardize based on NET)
           if (!verseNet && !verses.includes(v)) continue;
 
           const verseWeb = webChapterMap[v] || '';
@@ -152,6 +157,8 @@ async function processBibles() {
           const verseKjv = chapterKjv[v - 1] || '';
           const verseKrv = chapterKrv[v - 1] || '';
           const verseGreek = chapterGreek[v - 1] || '';
+          const verseCuv = chapterCuv[v - 1] || '';
+          const verseKougo = chapterKougo[v - 1] || '';
 
           unifiedData.push({
             id: `${bookKjv.abbrev || bookName.substring(0,3)}-${chapterNum}-${v}`,
@@ -160,6 +167,8 @@ async function processBibles() {
             web: verseWeb,
             kjv: verseKjv,
             krv: verseKrv,
+            cuv: verseCuv,
+            kougo: verseKougo,
             wlc: verseWlc,
             lxx: verseGreek
           });
