@@ -142,8 +142,8 @@ async function processBibles() {
         const chapterKrv = bookKrv.chapters[c] || [];
         const chapterGreek = bookGreek.chapters[c] || [];
         const chapterCuv = bookCuv.chapters[c] || [];
-        const chapterKougo = bookKougo.chapters[c] || [];
-
+        const chapterKougo = bookKougo.chapters[c]; // This is an object in JapKougo format
+        
         const verses = Object.keys(netChapterMap).map(Number).sort((a,b)=>a-b);
         const maxVerse = verses.length > 0 ? Math.max(...verses) : chapterKjv.length;
         
@@ -158,7 +158,16 @@ async function processBibles() {
           const verseKrv = chapterKrv[v - 1] || '';
           const verseGreek = chapterGreek[v - 1] || '';
           const verseCuv = chapterCuv[v - 1] || '';
-          const verseKougo = chapterKougo[v - 1] || '';
+          
+          let verseKougo = '';
+          if (chapterKougo && chapterKougo.verses) {
+            const vObj = chapterKougo.verses.find(vo => String(vo.verse) === String(v));
+            if (vObj) {
+              verseKougo = vObj.text;
+            } else if (chapterKougo.verses[v - 1]) {
+              verseKougo = chapterKougo.verses[v - 1].text || '';
+            }
+          }
 
           unifiedData.push({
             id: `${bookKjv.abbrev || bookName.substring(0,3)}-${chapterNum}-${v}`,
