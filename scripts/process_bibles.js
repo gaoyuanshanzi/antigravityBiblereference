@@ -17,16 +17,16 @@ function fetchJson(url) {
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         if (res.statusCode >= 400) {
-          resolve([]); 
+          resolve(Array.isArray(url.match(/get-chapter/)) ? [] : null);
           return;
         }
         try {
           resolve(JSON.parse(data.replace(/^\uFEFF/, '')));
         } catch (e) {
-          resolve([]);
+          resolve(Array.isArray(url.match(/get-chapter/)) ? [] : null);
         }
       });
-    }).on('error', () => resolve([]));
+    }).on('error', () => resolve(Array.isArray(url.match(/get-chapter/)) ? [] : null));
   });
 }
 
@@ -51,7 +51,10 @@ async function fetchBollsChapter(translation, bookId, chapterId) {
   const chapterMap = {};
   if (Array.isArray(data)) {
     data.forEach(item => {
-      chapterMap[item.verse] = item.text.replace(/<[^>]+>/g, '').trim(); 
+      let text = item.text || '';
+      // Remove html tags, commonly used in NET for footnotes/formatting
+      text = text.replace(/<[^>]+>/g, '').trim(); 
+      chapterMap[item.verse] = text; 
     });
   }
   bollsCache[cacheKey] = chapterMap;
@@ -69,56 +72,92 @@ async function processBibles() {
       fetchJson(GREEK_URL)
     ]);
 
-    console.log('Processing and aligning data, fetching WLC (Hebrew) via API...');
+    console.log('Fetching NET book list...');
+    const netBooks = await fetchJson('https://bolls.life/get-books/NET/');
+    if (!netBooks || netBooks.length === 0) {
+      throw new Error('Failed to fetch NET books');
+    }
+
+    console.log('Processing and aligning data using NET as standard...');
     const unifiedData = [];
     
-    for (let b = 0; b < kjvData.length; b++) {
-      const bookKjv = kjvData[b];
+    for (let b = 0; b < netBooks.length; b++) {
+      const bookNet = netBooks[b];
+      const bookNum = bookNet.bookid;
+      const bookName = bookNet.name;
+      const isOT = bookNum <= 39; 
+      
+      const bookKjv = kjvData[b] || { chapters: [], abbrev: bookName };
       const bookKrv = krvData[b] || { chapters: [] };
       const bookGreek = greekData[b] || { chapters: [] };
-      const bookName = bookKjv.name || bookKjv.abbrev.toUpperCase();
-      const isOT = b < 39; 
-      
-      const bookNum = b + 1;
 
-      process.stdout.write(`Processing Book ${bookNum}/${kjvData.length} (${bookName})...\r`);
+      process.stdout.write(`Processing Book ${bookNum}/${netBooks.length} (${bookName})...\r`);
 
       const wlcChapters = [];
+      const netChapters = [];
+      const webChapters = [];
       const batchSize = 10;
-      for (let i = 0; i < bookKjv.chapters.length; i += batchSize) {
-        const batch = [];
-        for (let j = 0; j < batchSize && (i + j) < bookKjv.chapters.length; j++) {
+      
+      for (let i = 0; i < bookNet.chapters; i += batchSize) {
+        const netBatch = [];
+        const webBatch = [];
+        const wlcBatch = [];
+        for (let j = 0; j < batchSize && (i + j) < bookNet.chapters; j++) {
           const chapterNum = i + j + 1;
+          netBatch.push(fetchBollsChapter('NET', bookNum, chapterNum));
+          webBatch.push(fetchBollsChapter('WEB', bookNum, chapterNum));
           if (isOT) {
-            batch.push(fetchBollsChapter('WLC', bookNum, chapterNum));
+            wlcBatch.push(fetchBollsChapter('WLC', bookNum, chapterNum));
           } else {
-            batch.push(Promise.resolve({}));
+            wlcBatch.push(Promise.resolve({}));
           }
         }
-        const results = await Promise.all(batch);
-        wlcChapters.push(...results);
-        if (isOT) await delay(100); 
+        const [netRes, webRes, wlcRes] = await Promise.all([
+          Promise.all(netBatch),
+          Promise.all(webBatch),
+          Promise.all(wlcBatch)
+        ]);
+        
+        netChapters.push(...netRes);
+        webChapters.push(...webRes);
+        wlcChapters.push(...wlcRes);
+        await delay(50); // slight delay to avoid rate limiting
       }
 
-      for (let c = 0; c < bookKjv.chapters.length; c++) {
-        const chapterKjv = bookKjv.chapters[c];
+      for (let c = 0; c < bookNet.chapters; c++) {
+        const chapterNum = c + 1;
+        const netChapterMap = netChapters[c] || {};
+        const webChapterMap = webChapters[c] || {};
+        const wlcChapterMap = wlcChapters[c] || {};
+
+        const chapterKjv = bookKjv.chapters[c] || [];
         const chapterKrv = bookKrv.chapters[c] || [];
         const chapterGreek = bookGreek.chapters[c] || [];
-        const chapterNum = c + 1;
 
-        const wlcChapterMap = wlcChapters[c];
+        // NET defines the verses
+        const verses = Object.keys(netChapterMap).map(Number).sort((a,b)=>a-b);
+        const maxVerse = verses.length > 0 ? Math.max(...verses) : chapterKjv.length;
+        
+        for (let v = 1; v <= maxVerse; v++) {
+          const verseNet = netChapterMap[v] || '';
+          // If NET has no verse here, we skip it because NET is the standard.
+          // Wait, sometimes a verse is empty in some translations but exists in standard.
+          // To be safe, if verseNet is empty and it's outside the keys, we might still include it if others have it?
+          // The user said: "성경장절 기준은 NET로 해줘" (Standardize based on NET)
+          if (!verseNet && !verses.includes(v)) continue;
 
-        for (let v = 0; v < chapterKjv.length; v++) {
-          const verseNum = v + 1;
-          const verseKjv = chapterKjv[v];
-          const verseKrv = chapterKrv[v] || '';
-          const verseGreek = chapterGreek[v] || '';
-
-          const verseWlc = isOT ? (wlcChapterMap[verseNum] || '') : 'Not Available (NT)';
+          const verseWeb = webChapterMap[v] || '';
+          const verseWlc = isOT ? (wlcChapterMap[v] || '') : 'Not Available (NT)';
+          
+          const verseKjv = chapterKjv[v - 1] || '';
+          const verseKrv = chapterKrv[v - 1] || '';
+          const verseGreek = chapterGreek[v - 1] || '';
 
           unifiedData.push({
-            id: `${bookKjv.abbrev}-${chapterNum}-${verseNum}`,
-            index: `${bookName} ${chapterNum}:${verseNum}`,
+            id: `${bookKjv.abbrev || bookName.substring(0,3)}-${chapterNum}-${v}`,
+            index: `${bookName} ${chapterNum}:${v}`,
+            net: verseNet,
+            web: verseWeb,
             kjv: verseKjv,
             krv: verseKrv,
             wlc: verseWlc,
