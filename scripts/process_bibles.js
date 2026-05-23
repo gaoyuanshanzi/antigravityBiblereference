@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const KJV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json';
-const KRV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/ko_ko.json';
+const KRV_URL = 'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/sources/ko/KorRV/KorRV.json';
 const GREEK_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/el_greek.json';
 const CUV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/zh_cuv.json';
 const KOUGO_URL = 'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/sources/ja/JapKougo/JapKougo.json';
@@ -67,7 +67,7 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
 async function processBibles() {
   console.log('Downloading Base Bible datasets...');
   try {
-    const [kjvData, krvData, greekData, cuvData, kougoDataRes] = await Promise.all([
+    const [kjvData, krvDataRes, greekData, cuvData, kougoDataRes] = await Promise.all([
       fetchJson(KJV_URL),
       fetchJson(KRV_URL),
       fetchJson(GREEK_URL),
@@ -75,7 +75,8 @@ async function processBibles() {
       fetchJson(KOUGO_URL)
     ]);
     
-    // JapKougo is wrapped in { books: [...] }
+    // KRV and JapKougo are wrapped in { books: [...] }
+    const krvData = krvDataRes && krvDataRes.books ? krvDataRes.books : [];
     const kougoData = kougoDataRes && kougoDataRes.books ? kougoDataRes.books : [];
 
     console.log('Fetching NET book list...');
@@ -139,7 +140,7 @@ async function processBibles() {
         const wlcChapterMap = wlcChapters[c] || {};
 
         const chapterKjv = bookKjv.chapters[c] || [];
-        const chapterKrv = bookKrv.chapters[c] || [];
+        const chapterKrv = bookKrv.chapters[c]; // This is an object in scrollmapper format
         const chapterGreek = bookGreek.chapters[c] || [];
         const chapterCuv = bookCuv.chapters[c] || [];
         const chapterKougo = bookKougo.chapters[c]; // This is an object in JapKougo format
@@ -155,9 +156,18 @@ async function processBibles() {
           const verseWlc = isOT ? (wlcChapterMap[v] || '') : 'Not Available (NT)';
           
           const verseKjv = chapterKjv[v - 1] || '';
-          const verseKrv = chapterKrv[v - 1] || '';
           const verseGreek = chapterGreek[v - 1] || '';
           const verseCuv = chapterCuv[v - 1] || '';
+          
+          let verseKrv = '';
+          if (chapterKrv && chapterKrv.verses) {
+            const vObj = chapterKrv.verses.find(vo => String(vo.verse) === String(v));
+            if (vObj) {
+              verseKrv = vObj.text;
+            } else if (chapterKrv.verses[v - 1]) {
+              verseKrv = chapterKrv.verses[v - 1].text || '';
+            }
+          }
           
           let verseKougo = '';
           if (chapterKougo && chapterKougo.verses) {
