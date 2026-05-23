@@ -143,17 +143,23 @@ export default function BibleViewer({ data, onDataFiltered }) {
     onDataFiltered(filteredData);
   }, [filteredData, onDataFiltered]);
 
+  // Fixed pixel width per column – keeps header and rows in sync during scroll
+  const COL_REF  = 160;
+  const COL_TEXT = 200;
+  const TOTAL_W  = COL_REF + COL_TEXT * 8; // 1760px
+
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Results Count Box */}
-      <div className="bg-indigo-50/60 p-2 border-b border-indigo-100 flex items-center justify-center text-indigo-900 font-semibold text-sm shadow-inner">
+      <div className="bg-indigo-50/60 p-2 border-b border-indigo-100 flex items-center justify-center text-indigo-900 font-semibold text-sm shadow-inner flex-shrink-0">
         <span className="bg-white px-4 py-1.5 rounded-full shadow-sm border border-indigo-200 flex items-center gap-2">
           <BookOpen size={16} className="text-indigo-500" />
           <span>검색된 성경 구절: <span className="text-indigo-600 text-base">{filteredData.length.toLocaleString()}</span> 개</span>
         </span>
       </div>
 
-      <div className="p-4 bg-slate-50 border-b border-slate-200">
+      {/* Reference search bar */}
+      <div className="p-4 bg-slate-50 border-b border-slate-200 flex-shrink-0">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <BookOpen size={18} className="text-slate-400" />
@@ -166,7 +172,7 @@ export default function BibleViewer({ data, onDataFiltered }) {
             className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
           />
           {refSearch && (
-            <button 
+            <button
               onClick={() => setRefSearch('')}
               className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
             >
@@ -176,119 +182,81 @@ export default function BibleViewer({ data, onDataFiltered }) {
         </div>
       </div>
 
-      <div className="flex border-b border-slate-200 shadow-sm z-10 min-w-max md:min-w-0">
-        <div className="w-[12%] flex-shrink-0 bg-slate-100 border-r border-slate-200">
-          <div className="p-3 font-semibold text-slate-800 h-full flex items-center justify-center text-xs lg:text-sm">
+      {/* Shared horizontal scroll wrapper for header + body */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden flex flex-col">
+
+        {/* ── Column Headers ── */}
+        <div
+          className="flex flex-shrink-0 border-b border-slate-200 shadow-sm z-10 bg-white"
+          style={{ width: TOTAL_W }}
+        >
+          <div style={{ width: COL_REF, minWidth: COL_REF }} className="flex-shrink-0 bg-slate-100 border-r border-slate-200 flex items-center justify-center p-3 font-semibold text-slate-800 text-xs lg:text-sm">
             Reference
           </div>
+          {[
+            { key: 'net',   title: 'NET (English)' },
+            { key: 'web',   title: 'WEB (English)' },
+            { key: 'kjv',   title: 'KJV (English)' },
+            { key: 'krv',   title: 'KRV (Korean)'  },
+            { key: 'cuv',   title: 'CUV (Chinese)'  },
+            { key: 'kougo', title: '口語訳 (Japanese)' },
+            { key: 'wlc',   title: 'WLC/HNT (Hebrew)' },
+            { key: 'lxx',   title: 'LXX/SBLGNT (Greek)' },
+          ].map(({ key, title }, i, arr) => (
+            <div
+              key={key}
+              style={{ width: COL_TEXT, minWidth: COL_TEXT }}
+              className={`flex-shrink-0${i < arr.length - 1 ? ' border-r border-slate-200' : ''}`}
+            >
+              <ColumnHeader
+                title={title}
+                searchTerm={searches[key]}
+                onSearchChange={(v) => handleSearchChange(key, v)}
+                onClear={() => clearSearch(key)}
+              />
+            </div>
+          ))}
         </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="NET (English)" 
-            searchTerm={searches.net} 
-            onSearchChange={(v) => handleSearchChange('net', v)}
-            onClear={() => clearSearch('net')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="WEB (English)" 
-            searchTerm={searches.web} 
-            onSearchChange={(v) => handleSearchChange('web', v)}
-            onClear={() => clearSearch('web')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="KJV (English)" 
-            searchTerm={searches.kjv} 
-            onSearchChange={(v) => handleSearchChange('kjv', v)}
-            onClear={() => clearSearch('kjv')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="KRV (Korean)" 
-            searchTerm={searches.krv} 
-            onSearchChange={(v) => handleSearchChange('krv', v)}
-            onClear={() => clearSearch('krv')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="CUV (Chinese)" 
-            searchTerm={searches.cuv} 
-            onSearchChange={(v) => handleSearchChange('cuv', v)}
-            onClear={() => clearSearch('cuv')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="口語訳 (Japanese)" 
-            searchTerm={searches.kougo} 
-            onSearchChange={(v) => handleSearchChange('kougo', v)}
-            onClear={() => clearSearch('kougo')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0 border-r border-slate-200">
-          <ColumnHeader 
-            title="WLC/HNT (Hebrew)" 
-            searchTerm={searches.wlc} 
-            onSearchChange={(v) => handleSearchChange('wlc', v)}
-            onClear={() => clearSearch('wlc')}
-          />
-        </div>
-        <div className="w-[11%] flex-shrink-0">
-          <ColumnHeader 
-            title="LXX/SBLGNT (Greek)" 
-            searchTerm={searches.lxx} 
-            onSearchChange={(v) => handleSearchChange('lxx', v)}
-            onClear={() => clearSearch('lxx')}
-          />
-        </div>
-      </div>
-      
-      <div className="flex-grow flex-1 relative overflow-x-auto">
-        <div className="absolute inset-0 min-w-max md:min-w-0">
+
+        {/* ── Data Rows (virtual scroll) ── */}
+        <div className="flex-1 relative" style={{ minHeight: 0 }}>
           {filteredData.length === 0 ? (
             <div className="flex items-center justify-center h-full text-slate-500">
               No verses found matching your search.
             </div>
           ) : (
             <Virtuoso
-              style={{ height: '100%' }}
+              style={{ height: '100%', width: TOTAL_W }}
               totalCount={filteredData.length}
               itemContent={(index) => {
                 const item = filteredData[index];
                 return (
-                  <div className="flex border-b border-slate-100 hover:bg-indigo-50/50 transition-colors duration-150 py-2">
-                    <div className="w-[12%] p-2 text-xs lg:text-sm font-medium text-slate-500 flex-shrink-0 flex items-start border-r border-slate-100">
+                  <div
+                    className="flex border-b border-slate-100 hover:bg-indigo-50/50 transition-colors duration-150 py-2"
+                    style={{ width: TOTAL_W }}
+                  >
+                    <div style={{ width: COL_REF, minWidth: COL_REF }} className="p-2 text-xs lg:text-sm font-medium text-slate-500 flex-shrink-0 flex items-start border-r border-slate-100">
                       {item.index}
                     </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.net}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.web}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.kjv}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.krv}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.cuv}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words">
-                      {item.kougo}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 border-r border-slate-100 break-words" dir="rtl">
-                      {item.wlc}
-                    </div>
-                    <div className="w-[11%] p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 break-words">
-                      {item.lxx}
-                    </div>
+                    {[
+                      { key: 'net' },
+                      { key: 'web' },
+                      { key: 'kjv' },
+                      { key: 'krv' },
+                      { key: 'cuv' },
+                      { key: 'kougo' },
+                      { key: 'wlc',  dir: 'rtl' },
+                      { key: 'lxx' },
+                    ].map(({ key, dir }, i, arr) => (
+                      <div
+                        key={key}
+                        dir={dir}
+                        style={{ width: COL_TEXT, minWidth: COL_TEXT }}
+                        className={`p-2 text-xs lg:text-sm text-slate-800 flex-shrink-0 break-words${i < arr.length - 1 ? ' border-r border-slate-100' : ''}`}
+                      >
+                        {item[key]}
+                      </div>
+                    ))}
                   </div>
                 );
               }}
