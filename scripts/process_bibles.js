@@ -148,12 +148,26 @@ async function processBibles() {
         const verses = Object.keys(netChapterMap).map(Number).sort((a,b)=>a-b);
         const maxVerse = verses.length > 0 ? Math.max(...verses) : chapterKjv.length;
         
+        function mapWlcVersification(bNum, cNum, vNum) {
+          if (bNum === 23 && cNum === 9) { // Isaiah 9
+            if (vNum === 1) return { mappedChapter: 8, mappedVerse: 23 };
+            return { mappedChapter: 9, mappedVerse: vNum - 1 };
+          }
+          return { mappedChapter: cNum, mappedVerse: vNum };
+        }
+        
         for (let v = 1; v <= maxVerse; v++) {
           const verseNet = netChapterMap[v] || '';
           if (!verseNet && !verses.includes(v)) continue;
 
           const verseWeb = webChapterMap[v] || '';
-          const verseWlc = isOT ? (wlcChapterMap[v] || '') : 'Not Available (NT)';
+          
+          let verseWlc = 'Not Available (NT)';
+          if (isOT) {
+            const { mappedChapter, mappedVerse } = mapWlcVersification(bookNum, chapterNum, v);
+            const wlcMap = wlcChapters[mappedChapter - 1] || {};
+            verseWlc = wlcMap[mappedVerse] || '';
+          }
           
           const verseKjv = chapterKjv[v - 1] || '';
           const verseGreek = chapterGreek[v - 1] || '';
