@@ -1,3 +1,4 @@
+/* global process */
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
@@ -10,10 +11,10 @@ const KJV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/jso
 const KRV_URL = 'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/sources/ko/KorRV/KorRV.json';
 const GREEK_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/el_greek.json';
 const CUV_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/zh_cuv.json';
-const KOUGO_URL = 'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/sources/ja/JapKougo/JapKougo.json';
+const KOUGO_URL = 'https://bolls.life/static/translations/JPKJV.json';
 
 function fetchJson(url) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
@@ -24,7 +25,7 @@ function fetchJson(url) {
         }
         try {
           resolve(JSON.parse(data.replace(/^\uFEFF/, '')));
-        } catch (e) {
+        } catch {
           resolve(Array.isArray(url.match(/get-chapter/)) ? [] : null);
         }
       });
@@ -75,9 +76,16 @@ async function processBibles() {
       fetchJson(KOUGO_URL)
     ]);
     
-    // KRV and JapKougo are wrapped in { books: [...] }
+    // KRV is wrapped in { books: [...] }
     const krvData = krvDataRes && krvDataRes.books ? krvDataRes.books : [];
-    const kougoData = kougoDataRes && kougoDataRes.books ? kougoDataRes.books : [];
+
+    // Build a map for JPKJV verses: bookNum-chapterNum-verseNum -> text
+    const kougoMap = {};
+    if (Array.isArray(kougoDataRes)) {
+      kougoDataRes.forEach(item => {
+        kougoMap[`${item.book}-${item.chapter}-${item.verse}`] = item.text;
+      });
+    }
 
     console.log('Fetching NET book list...');
     const netBooks = await fetchJson('https://bolls.life/get-books/NET/');
@@ -98,7 +106,6 @@ async function processBibles() {
       const bookKrv = krvData[b] || { chapters: [] };
       const bookGreek = greekData[b] || { chapters: [] };
       const bookCuv = cuvData[b] || { chapters: [] };
-      const bookKougo = kougoData[b] || { chapters: [] };
 
       process.stdout.write(`Processing Book ${bookNum}/${netBooks.length} (${bookName})...\r`);
 
@@ -137,13 +144,11 @@ async function processBibles() {
         const chapterNum = c + 1;
         const netChapterMap = netChapters[c] || {};
         const webChapterMap = webChapters[c] || {};
-        const wlcChapterMap = wlcChapters[c] || {};
 
         const chapterKjv = bookKjv.chapters[c] || [];
         const chapterKrv = bookKrv.chapters[c]; // This is an object in scrollmapper format
         const chapterGreek = bookGreek.chapters[c] || [];
         const chapterCuv = bookCuv.chapters[c] || [];
-        const chapterKougo = bookKougo.chapters[c]; // This is an object in JapKougo format
         
         const verses = Object.keys(netChapterMap).map(Number).sort((a,b)=>a-b);
         const maxVerse = verses.length > 0 ? Math.max(...verses) : chapterKjv.length;
@@ -184,13 +189,14 @@ async function processBibles() {
           }
           
           let verseKougo = '';
-          if (chapterKougo && chapterKougo.verses) {
-            const vObj = chapterKougo.verses.find(vo => String(vo.verse) === String(v));
-            if (vObj) {
-              verseKougo = vObj.text;
-            } else if (chapterKougo.verses[v - 1]) {
-              verseKougo = chapterKougo.verses[v - 1].text || '';
-            }
+          const kougoKey = `${bookNum}-${chapterNum}-${v}`;
+          if (kougoMap[kougoKey]) {
+            let text = kougoMap[kougoKey];
+            // Remove rubi tags first
+            text = text.replace(/<sup>.*?<\/sup>/g, '');
+            // Strip other HTML tags
+            text = text.replace(/<[^>]+>/g, '').trim();
+            verseKougo = text;
           }
 
           unifiedData.push({
