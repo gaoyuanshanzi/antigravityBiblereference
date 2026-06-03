@@ -30,6 +30,18 @@ const ColumnHeader = ({ title, searchTerm, onSearchChange, isActive, onClear }) 
   </div>
 );
 
+const OT_BOOKS = new Set([
+  'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
+  'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
+  '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles',
+  'Ezra', 'Nehemiah', 'Esther', 'Job', 'Psalms',
+  'Proverbs', 'Ecclesiastes', 'Song of Solomon', 'Isaiah',
+  'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel',
+  'Hosea', 'Joel', 'Amos', 'Obadiah', 'Jonah',
+  'Micah', 'Nahum', 'Habakkuk', 'Zephaniah',
+  'Haggai', 'Zechariah', 'Malachi'
+]);
+
 export default function BibleViewer({ data, onDataFiltered }) {
   const [searches, setSearches] = useState({
     net: '',
@@ -72,6 +84,19 @@ export default function BibleViewer({ data, onDataFiltered }) {
         const itemIndexLower = item.index.toLowerCase();
         
         return queries.some(q => {
+          if (q === 'ot') {
+            const lastSpaceIdx = item.index.lastIndexOf(' ');
+            if (lastSpaceIdx === -1) return false;
+            const bookName = item.index.substring(0, lastSpaceIdx);
+            return OT_BOOKS.has(bookName);
+          }
+          if (q === 'nt') {
+            const lastSpaceIdx = item.index.lastIndexOf(' ');
+            if (lastSpaceIdx === -1) return false;
+            const bookName = item.index.substring(0, lastSpaceIdx);
+            return !OT_BOOKS.has(bookName);
+          }
+
           const rangeMatch = q.match(/(.+?)\s*:\s*(\d+)\s*-\s*(\d+)/);
           if (rangeMatch) {
             const baseRef = rangeMatch[1]; 
