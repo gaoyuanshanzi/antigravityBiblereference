@@ -4,10 +4,14 @@ export const exportToCSV = (data, filename = 'bible_comparison.csv') => {
   // Map data to the desired column format
   const formattedData = data.map(row => ({
     'Index': row.index,
+    'NET (English)': row.net,
+    'WEB (English)': row.web,
     'KJV (English)': row.kjv,
     'KRV (Korean)': row.krv,
-    'WLC (Hebrew)': row.wlc,
-    'LXX (Greek)': row.lxx
+    'CUV (Chinese)': row.cuv,
+    '口語訳 (Japanese)': row.kougo,
+    'WLC/HNT (Hebrew)': row.wlc,
+    'LXX/SBLGNT (Greek)': row.lxx
   }));
 
   const csv = Papa.unparse(formattedData);
